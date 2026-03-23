@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "patly"
+version = "0.2.2"
+description = "Gasless Polymarket position redemption — Redeem as a Service"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "requests>=2.31",
+    "web3>=6.0",
+    "eth-account>=0.10",
+    "python-dotenv>=1.0",
+]
+
+[project.urls]
+Homepage = "https://patly.online"
+Documentation = "https://docs.patly.online"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["patly*"]
