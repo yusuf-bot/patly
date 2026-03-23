@@ -1,4 +1,4 @@
-# patly
+# :Patly
 **Gasless Polymarket position redemption. $0.01 per redemption, deducted from your winnings.**
 ```python
 import patly, os
