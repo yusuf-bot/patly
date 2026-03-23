@@ -165,5 +165,5 @@ You can verify this yourself by inspecting the open-source client or running a p
 ## Service
 
 - **Network**: Polygon (eip155:137)
-- **API**: http://patly.dev
+- **API**: https://patly.mintlify.app/introduction
 - **Source**: github.com/yourhandle/patly
