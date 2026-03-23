@@ -1,7 +1,5 @@
 # patly
-
 **Gasless Polymarket position redemption. $0.01 per redemption, deducted from your winnings.**
-
 ```python
 import patly, os
 patly.init(api_key=os.getenv("PATLY_API_KEY"), pk=os.getenv("PK"))
@@ -14,23 +12,23 @@ That's it.
 
 ## How it works
 
-When you call `patly.redeem()`, the library:
+When you call `patly.redeem()`, your private key **never leaves your machine**. Here's exactly what happens:
 
-1. Fetches the market's `conditionId` from Patly
-2. Verifies the market is resolved on-chain
-3. Builds a **Safe multisend transaction** containing:
-   - `redeemPositions()` — claims your winning USDC into your wallet
+1. Patly fetches the market's `conditionId` and verifies it's resolved on-chain
+2. A **Safe multisend transaction** is built locally on your machine containing:
+   - `redeemPositions()` — claims your winning USDC
    - `USDC.transfer($0.01 → Patly)` — fee, paid from your winnings
-4. Signs the transaction **locally** with your private key
-5. Sends only the **signature** to Patly — never the key
-6. Patly relays it through Polymarket's gasless Builder relayer
+3. The transaction is **signed locally** using your private key via `eth_account` — standard Ethereum signing, your key never moves
+4. Only the **signature bytes** are transmitted to Patly — mathematically impossible to reverse into a private key
+5. Patly relays the signed transaction through Polymarket's gasless Builder relayer
 
-Everything is **gasless** (Polymarket pays gas) and **atomic** — the fee only goes through if the redemption succeeds.
+Your private key is used identically to how MetaMask signs transactions — it produces a signature and nothing else is transmitted.
+
+Everything is **gasless** (Polymarket covers gas) and **atomic** — the $0.01 fee only transfers if the redemption succeeds.
 
 ---
 
 ## Installation
-
 ```bash
 pip install patly
 ```
@@ -40,11 +38,9 @@ pip install patly
 ## Quickstart
 
 ### 1. Register
-
 ```python
 import requests
-
-r = requests.post("http://patly.duckdns.org/register", json={
+r = requests.post("http://patly.dev/register", json={
     "wallet": "0xYourPolymarketWallet"
 })
 print(r.json())
@@ -52,25 +48,21 @@ print(r.json())
 ```
 
 ### 2. Set env vars
-
 ```env
 PATLY_API_KEY=your_api_key_here
 PK=0xyour_polymarket_wallet_private_key
 ```
 
 ### 3. Redeem
-
 ```python
 import patly, os
 from dotenv import load_dotenv
-
 load_dotenv()
 
 patly.init(
     api_key=os.getenv("PATLY_API_KEY"),
     pk=os.getenv("PK"),
 )
-
 patly.redeem("btc-updown-15m-1774088100", "NO")
 # [patly] ✅ btc-updown-15m-1774088100: 0xabc123...
 ```
@@ -80,21 +72,16 @@ patly.redeem("btc-updown-15m-1774088100", "NO")
 ## API
 
 ### Module-level (recommended)
-
 ```python
 import patly
-
 patly.init(api_key="...", pk="0x...")
-
 patly.redeem("btc-updown-15m-1774088100", "YES")
 ```
 
 ### Class API
-
 ```python
 from patly import Patly
-
-p = Patly(api_key="...", pk="0x...", url="http://patly.duckdns.org")
+p = Patly(api_key="...", pk="0x...")
 
 # Redeem a position
 result = p.redeem("btc-updown-15m-1774088100", "NO")
@@ -111,14 +98,11 @@ p.history(limit=20)
 
 ---
 
-## Bot integration example
-
+## Bot integration
 ```python
-import patly, os, logging
+import patly, os
 from dotenv import load_dotenv
-
 load_dotenv()
-logging.basicConfig(level=logging.INFO)
 
 patly.init(
     api_key=os.getenv("PATLY_API_KEY"),
@@ -133,26 +117,32 @@ def on_market_resolved(slug: str, won_side: str):
 
 ## Security
 
-| Action | Where it happens |
-|--------|-----------------|
+Your private key is used **only** to produce a cryptographic signature, locally, using Python's `eth_account` library — the same library Polymarket's own SDK uses. The signing happens in-process on your machine and the key is never serialized, logged, or transmitted.
+
+| What happens | Where |
+|---|---|
 | Build `redeemPositions()` calldata | Your machine |
 | Build fee transfer calldata | Your machine |
-| Sign Safe transaction with PK | Your machine |
-| Transmit to Patly | Signature only — never the PK |
+| Sign transaction with PK (via `eth_account`) | Your machine, in-process |
+| What's sent to Patly | 65-byte ECDSA signature only |
+| What Patly sees | Signature + slug + won_side |
+| What Patly never sees | Your private key |
 
-You can verify with Wireshark or Charles Proxy that no private key bytes are transmitted.
+A valid ECDSA signature cannot be reversed to recover a private key — this is a mathematical guarantee of elliptic curve cryptography, not a policy.
+
+You can verify this yourself by inspecting the open-source client or running a packet capture (Wireshark) — you will see the signature but never any key material.
 
 ---
 
 ## Pricing
 
 | | |
-|--|--|
+|---|---|
 | Registration | Free |
 | Per redemption | $0.01 USDC |
-| How it's paid | Bundled into your redeem tx — from winnings |
+| How it's paid | Bundled atomically into your redeem tx |
 | Separate balance needed | ❌ No |
-| Gas needed | ❌ No (gasless via Polymarket relayer) |
+| Gas needed | ❌ No |
 
 ---
 
@@ -160,21 +150,20 @@ You can verify with Wireshark or Charles Proxy that no private key bytes are tra
 
 - Python 3.10+
 - A Polymarket wallet with winning positions to redeem
-- `py_builder_relayer_client` (Polymarket's Safe signing SDK)
 
 ---
 
 ## Environment variables
 
 | Variable | Description |
-|----------|-------------|
-| `PATLY_API_KEY` | Your Patly API key |
-| `PK` | Private key of your Polymarket wallet |
+|---|---|
+| `PATLY_API_KEY` | Your Patly API key (from `/register`) |
+| `PK` | Private key of your Polymarket wallet — used only for local signing |
 
 ---
 
 ## Service
 
 - **Network**: Polygon (eip155:137)
-- **API**: http://patly.duckdns.org
-- **Docs**: https://patly.mintlify.app
+- **API**: http://patly.dev
+- **Source**: github.com/yourhandle/patly
